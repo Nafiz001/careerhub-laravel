@@ -1,0 +1,27 @@
+# Render Blueprint for CareerHub (free tier, Docker runtime).
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: careerhub
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: APP_NAME
+        value: CareerHub
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      # Generate once with `php artisan key:generate --show` and paste here,
+      # or leave unset and the entrypoint will generate one on boot.
+      - key: APP_KEY
+        sync: false
+      - key: DB_CONNECTION
+        value: sqlite
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: LOG_CHANNEL
+        value: stderr
