@@ -1,3 +1,78 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    :root {
+        color-scheme: light;
+    }
+
+    html {
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        font-feature-settings: 'cv11', 'ss01';
+        text-rendering: optimizeLegibility;
+    }
+
+    /* Editorial display headings use Fraunces with optical sizing. */
+    .font-serif {
+        font-optical-sizing: auto;
+        letter-spacing: -0.01em;
+    }
+
+    /* Warm, restrained focus ring — clay, with offset. */
+    :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+        outline: 2px solid theme('colors.clay.DEFAULT');
+        outline-offset: 2px;
+        border-radius: 6px;
+    }
+
+    /* Quiet scrollbar that matches the canvas. */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: theme('colors.hairline') transparent;
+    }
+    *::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    *::-webkit-scrollbar-thumb {
+        background: theme('colors.hairline');
+        border-radius: 999px;
+        border: 3px solid theme('colors.canvas');
+    }
+
+    ::selection {
+        background: theme('colors.clay.soft');
+        color: theme('colors.clay.strong');
+    }
+}
+
+@layer components {
+    /* Hairline-led card surface. */
+    .card {
+        @apply rounded-card border border-hairline bg-surface;
+    }
+
+    /* Pill chip used for skills / facets. */
+    .chip {
+        @apply inline-flex items-center gap-1 rounded-full border border-hairline bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-muted;
+    }
+
+    /* The thin top accent rule — a recurring editorial signature. */
+    .accent-rule {
+        @apply h-px w-full bg-gradient-to-r from-transparent via-clay/40 to-transparent;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
+}
