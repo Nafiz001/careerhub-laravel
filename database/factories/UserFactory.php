@@ -42,4 +42,39 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    /**
+     * A seeker with a fleshed-out profile.
+     */
+    public function seeker(): static
+    {
+        return $this->state(fn () => [
+            'role' => 'seeker',
+            'headline' => fake()->jobTitle(),
+            'bio' => fake()->paragraph(3),
+            'location' => fake()->randomElement(['Dhaka, Bangladesh', 'Chattogram, Bangladesh', 'Remote']),
+            'phone' => '+8801'.fake()->numerify('#########'),
+            'skills' => fake()->randomElements(
+                ['PHP', 'Laravel', 'Vue.js', 'React', 'TypeScript', 'MySQL', 'Docker', 'AWS', 'Python'],
+                fake()->numberBetween(3, 6)
+            ),
+            'experience_level' => fake()->randomElement(User::EXPERIENCE_LEVELS),
+        ]);
+    }
+
+    /**
+     * An employer with a company profile.
+     */
+    public function employer(): static
+    {
+        $company = fake()->company();
+
+        return $this->state(fn () => [
+            'role' => 'employer',
+            'company_name' => $company,
+            'website' => 'https://'.Str::slug($company).'.com',
+            'about' => fake()->paragraph(3),
+            'location' => fake()->randomElement(['Dhaka, Bangladesh', 'Chattogram, Bangladesh']),
+        ]);
+    }
 }

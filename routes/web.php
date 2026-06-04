@@ -3,7 +3,9 @@
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\JobController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SavedJobController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -32,10 +34,20 @@ Route::middleware('auth')->group(function () {
     Route::delete('/manage/jobs/{job}', [JobController::class, 'destroy'])->name('jobs.destroy');
     Route::get('/manage/jobs/{job}/applicants', [ApplicationController::class, 'forJob'])->name('jobs.applicants');
     Route::patch('/applications/{application}/status', [ApplicationController::class, 'updateStatus'])->name('applications.status');
+    Route::get('/applications/{application}/resume', [ApplicationController::class, 'downloadResume'])->name('applications.resume');
 
     // Seeker: apply + view my applications.
     Route::post('/jobs/{job}/apply', [ApplicationController::class, 'store'])->name('applications.store');
     Route::get('/my/applications', [ApplicationController::class, 'index'])->name('applications.index');
+
+    // Seeker: saved jobs (bookmarks).
+    Route::get('/my/saved-jobs', [SavedJobController::class, 'index'])->name('saved-jobs.index');
+    Route::post('/jobs/{job}/save', [SavedJobController::class, 'toggle'])->name('saved-jobs.toggle');
+
+    // Notifications (in-app feed).
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
 
     // Profile (Breeze).
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
