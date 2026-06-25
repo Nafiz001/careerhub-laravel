@@ -6,6 +6,18 @@ services:
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
+    # Don't let Cloudflare cache JS/CSS bundles. Render's free tier sleeps
+    # after 15 min of inactivity; on the next request the origin can take
+    # 30+ s to wake up. A cached stale 520 error then gets replayed to
+    # every visitor until the cache TTL expires. Bypassing the cache for
+    # /build/assets/ means each request always asks the live origin.
+    headers:
+      - path: /build/assets/*
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
+      - path: /build/assets/*
+        name: Pragma
+        value: no-cache
     envVars:
       - key: APP_NAME
         value: CareerHub
