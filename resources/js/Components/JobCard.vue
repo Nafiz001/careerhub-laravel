@@ -1,45 +1,93 @@
 <script setup>
+import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import Badge from '@/Components/Badge.vue';
+import Icon from '@/Components/Icon.vue';
+import Avatar from '@/Components/Avatar.vue';
+import SaveButton from '@/Components/SaveButton.vue';
 
-defineProps({
+const props = defineProps({
     job: { type: Object, required: true },
+    saved: { type: Boolean, default: false },
+    canSave: { type: Boolean, default: false },
 });
+
+// Prefer the structured salary range; fall back to the free-text field.
+const salary = computed(() => {
+    const fmt = (n) => '$' + Number(n).toLocaleString();
+    const { salary_min: min, salary_max: max, salary_range: text } = props.job;
+    if (min && max) return `${fmt(min)} – ${fmt(max)}`;
+    if (min) return `From ${fmt(min)}`;
+    if (max) return `Up to ${fmt(max)}`;
+    return text || null;
+});
+
+const skills = computed(() => (Array.isArray(props.job.skills) ? props.job.skills : []));
+const companyName = computed(() => props.job.employer?.company_name || props.job.company);
 </script>
 
 <template>
-    <Link
-        :href="route('jobs.show', job.id)"
-        class="group flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+    <div
+        class="group relative flex h-full flex-col rounded-card border bg-surface p-5 shadow-soft transition duration-200 hover:-translate-y-0.5 hover:shadow-lift"
+        :class="job.is_featured ? 'border-clay/30' : 'border-hairline hover:border-clay/30'"
     >
+        <!-- Featured accent rule -->
+        <div v-if="job.is_featured" class="absolute inset-x-0 top-0 h-0.5 rounded-t-card bg-gradient-to-r from-clay/0 via-clay to-clay/0" />
+
         <div class="flex items-start justify-between gap-3">
-            <div>
-                <h3 class="text-base font-semibold text-gray-900 group-hover:text-indigo-600">
-                    {{ job.title }}
-                </h3>
-                <p class="mt-0.5 text-sm font-medium text-gray-600">{{ job.company }}</p>
+            <div class="flex min-w-0 items-start gap-3">
+                <Avatar
+                    :name="companyName"
+                    :src="job.employer?.logo ? `/storage/${job.employer.logo}` : null"
+                    :size="40"
+                    square
+                />
+                <div class="min-w-0">
+                    <Link :href="route('jobs.show', job.id)" class="block">
+                        <h3 class="truncate font-serif text-base font-medium text-ink transition group-hover:text-clay-strong">
+                            {{ job.title }}
+                        </h3>
+                    </Link>
+                    <p class="mt-0.5 truncate text-sm text-muted">{{ companyName }}</p>
+                </div>
             </div>
-            <Badge :label="job.type" :variant="job.type" />
+            <SaveButton v-if="canSave" :job-id="job.id" :saved="saved" />
         </div>
 
-        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
-            <span class="inline-flex items-center gap-1">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        <!-- Meta -->
+        <div class="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted">
+            <span class="inline-flex items-center gap-1.5">
+                <Icon name="map-pin" :size="15" class="text-muted/70" />
                 {{ job.location }}
             </span>
-            <span v-if="job.salary_range" class="inline-flex items-center gap-1">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" /></svg>
-                {{ job.salary_range }}
+            <span v-if="salary" class="inline-flex items-center gap-1.5 font-mono text-[13px] tabular-nums">
+                <Icon name="dollar-sign" :size="15" class="text-muted/70" />
+                {{ salary }}
             </span>
         </div>
 
-        <p class="mt-3 line-clamp-2 flex-1 text-sm text-gray-600">{{ job.description }}</p>
-
-        <div class="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
-            <span class="text-xs text-gray-400">
-                {{ job.applications_count ?? 0 }} applicant{{ (job.applications_count ?? 0) === 1 ? '' : 's' }}
-            </span>
-            <span class="text-sm font-medium text-indigo-600 group-hover:underline">View details &rarr;</span>
+        <!-- Skills -->
+        <div v-if="skills.length" class="mt-3.5 flex flex-wrap gap-1.5">
+            <span v-for="s in skills.slice(0, 4)" :key="s" class="chip">{{ s }}</span>
+            <span v-if="skills.length > 4" class="chip">+{{ skills.length - 4 }}</span>
         </div>
-    </Link>
+
+        <p v-else class="mt-3.5 line-clamp-2 flex-1 text-sm leading-relaxed text-muted">{{ job.description }}</p>
+
+        <!-- Footer -->
+        <div class="mt-4 flex items-center justify-between gap-2 border-t border-hairline pt-3.5">
+            <div class="flex flex-wrap items-center gap-1.5">
+                <Badge :label="job.type" :variant="job.type" />
+                <Badge v-if="job.remote && job.type !== 'remote'" label="Remote" variant="remote" />
+                <Badge v-if="job.is_featured" label="Featured" variant="featured" />
+            </div>
+            <Link
+                :href="route('jobs.show', job.id)"
+                class="inline-flex items-center gap-1 text-sm font-medium text-clay transition group-hover:gap-1.5 group-hover:text-clay-strong"
+            >
+                View
+                <Icon name="arrow-right" :size="15" />
+            </Link>
+        </div>
+    </div>
 </template>

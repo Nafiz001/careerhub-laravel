@@ -4,8 +4,12 @@ set -e
 cd /app
 
 # Generate an app key if one was not supplied via the environment.
+# We export it directly rather than letting `artisan key:generate`
+# rewrite /app/.env, because the image ships no .env file (and any
+# change would be lost on the next deploy anyway).
 if [ -z "${APP_KEY}" ]; then
-    php artisan key:generate --force
+    APP_KEY="base64:$(php -r 'echo base64_encode(random_bytes(32));')"
+    export APP_KEY
 fi
 
 # Cache config/routes/views for production performance.

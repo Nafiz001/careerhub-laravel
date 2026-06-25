@@ -12,25 +12,37 @@ use Inertia\Response;
 class JobController extends Controller
 {
     /**
-     * Public, paginated job listing with search + filters.
+     * Public, paginated job listing with search + advanced filters.
      */
     public function index(Request $request): Response
     {
-        $filters = $request->only(['search', 'type', 'location']);
+        $filters = $request->only([
+            'search', 'type', 'location', 'category',
+            'experience_level', 'remote', 'salary_min', 'salary_max', 'skills',
+        ]);
 
         $jobs = Job::query()
             ->with('employer:id,name')
             ->withCount('applications')
             ->where('is_open', true)
             ->filter($filters)
+            ->orderByDesc('is_featured')
             ->latest()
             ->paginate(9)
             ->withQueryString();
+
+        // IDs the current seeker has saved, so the listing can show toggles.
+        $savedJobIds = $request->user()?->isSeeker()
+            ? $request->user()->savedJobs()->pluck('job_posts.id')
+            : collect();
 
         return Inertia::render('Jobs/Index', [
             'jobs' => $jobs,
             'filters' => $filters,
             'types' => Job::TYPES,
+            'categories' => Job::CATEGORIES,
+            'experienceLevels' => Job::EXPERIENCE_LEVELS,
+            'savedJobIds' => $savedJobIds,
             // Distinct locations power the filter dropdown.
             'locations' => Job::query()->where('is_open', true)
                 ->distinct()->orderBy('location')->pluck('location'),
@@ -38,24 +50,32 @@ class JobController extends Controller
     }
 
     /**
-     * Public job detail. Surfaces whether the seeker already applied.
+     * Public job detail. Surfaces whether the seeker already applied / saved,
+     * and counts a view.
      */
     public function show(Request $request, Job $job): Response
     {
-        $job->load('employer:id,name');
+        // Count the view (does not touch updated_at).
+        $job->incrementQuietly('views_count');
+
+        $job->load('employer:id,name,company_name,logo,website,about');
 
         $hasApplied = false;
         $canApply = false;
+        $isSaved = false;
 
         if ($user = $request->user()) {
             $hasApplied = $job->applications()->where('seeker_id', $user->id)->exists();
             $canApply = $user->can('apply', $job) && ! $hasApplied;
+            $isSaved = $user->isSeeker()
+                && $user->savedJobs()->where('job_posts.id', $job->id)->exists();
         }
 
         return Inertia::render('Jobs/Show', [
             'job' => $job,
             'hasApplied' => $hasApplied,
             'canApply' => $canApply,
+            'isSaved' => $isSaved,
             'applicationsCount' => $job->applications()->count(),
         ]);
     }
@@ -66,6 +86,8 @@ class JobController extends Controller
 
         return Inertia::render('Jobs/Create', [
             'types' => Job::TYPES,
+            'categories' => Job::CATEGORIES,
+            'experienceLevels' => Job::EXPERIENCE_LEVELS,
         ]);
     }
 
@@ -89,6 +111,8 @@ class JobController extends Controller
         return Inertia::render('Jobs/Edit', [
             'job' => $job,
             'types' => Job::TYPES,
+            'categories' => Job::CATEGORIES,
+            'experienceLevels' => Job::EXPERIENCE_LEVELS,
         ]);
     }
 
@@ -119,8 +143,17 @@ class JobController extends Controller
             'company' => ['required', 'string', 'max:255'],
             'location' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(Job::TYPES)],
+            'category' => ['nullable', Rule::in(Job::CATEGORIES)],
+            'experience_level' => ['nullable', Rule::in(Job::EXPERIENCE_LEVELS)],
             'salary_range' => ['nullable', 'string', 'max:255'],
+            'salary_min' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            'salary_max' => ['nullable', 'integer', 'min:0', 'max:100000000', 'gte:salary_min'],
             'description' => ['required', 'string', 'min:20'],
+            'skills' => ['nullable', 'array'],
+            'skills.*' => ['string', 'max:50'],
+            'remote' => ['boolean'],
+            'application_deadline' => ['nullable', 'date'],
+            'is_featured' => ['boolean'],
             'is_open' => ['required', 'boolean'],
         ]);
     }

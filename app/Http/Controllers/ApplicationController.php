@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Application;
 use App\Models\Job;
+use App\Notifications\ApplicationStatusUpdated;
+use App\Notifications\NewApplicationReceived;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -13,7 +16,8 @@ use Inertia\Response;
 class ApplicationController extends Controller
 {
     /**
-     * Seeker submits an application to a job (once).
+     * Seeker submits an application to a job (once), optionally attaching a
+     * PDF/DOC resume. The owning employer is notified.
      */
     public function store(Request $request, Job $job): RedirectResponse
     {
@@ -29,14 +33,27 @@ class ApplicationController extends Controller
 
         $data = $request->validate([
             'cover_letter' => ['required', 'string', 'min:20', 'max:5000'],
+            'resume' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
         ]);
 
-        Application::create([
+        $attributes = [
             'job_post_id' => $job->id,
             'seeker_id' => $request->user()->id,
             'cover_letter' => $data['cover_letter'],
             'status' => 'pending',
-        ]);
+        ];
+
+        if ($request->hasFile('resume')) {
+            $file = $request->file('resume');
+            $attributes['resume_path'] = $file->store('resumes', 'public');
+            $attributes['resume_name'] = $file->getClientOriginalName();
+        }
+
+        $application = Application::create($attributes);
+
+        // Notify the employer (database + mail).
+        $application->loadMissing('job.employer', 'seeker');
+        $job->employer->notify(new NewApplicationReceived($application));
 
         return redirect()->route('applications.index')
             ->with('success', 'Application submitted!');
@@ -65,7 +82,7 @@ class ApplicationController extends Controller
         $this->authorize('viewApplicants', $job);
 
         $applicants = $job->applications()
-            ->with('seeker:id,name,email')
+            ->with('seeker:id,name,email,headline,location,experience_level')
             ->latest()
             ->get();
 
@@ -77,7 +94,7 @@ class ApplicationController extends Controller
     }
 
     /**
-     * Employer updates an applicant's status.
+     * Employer updates an applicant's status; the seeker is notified.
      */
     public function updateStatus(Request $request, Application $application): RedirectResponse
     {
@@ -87,8 +104,30 @@ class ApplicationController extends Controller
             'status' => ['required', Rule::in(Application::STATUSES)],
         ]);
 
+        $changed = $application->status !== $data['status'];
+
         $application->update($data);
 
+        if ($changed) {
+            $application->loadMissing('seeker', 'job');
+            $application->seeker->notify(new ApplicationStatusUpdated($application));
+        }
+
         return back()->with('success', 'Applicant status updated.');
+    }
+
+    /**
+     * Owning employer downloads an applicant's uploaded resume.
+     */
+    public function downloadResume(Request $request, Application $application): mixed
+    {
+        $this->authorize('viewApplicants', $application->job);
+
+        abort_unless($application->resume_path && Storage::disk('public')->exists($application->resume_path), 404);
+
+        return Storage::disk('public')->download(
+            $application->resume_path,
+            $application->resume_name ?? basename($application->resume_path)
+        );
     }
 }
