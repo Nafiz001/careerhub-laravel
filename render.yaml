@@ -13,6 +13,9 @@ services:
         value: production
       - key: APP_DEBUG
         value: "false"
+      # NOTE: APP_URL is set inside AppServiceProvider::fixHttpsBehindProxy()
+      # so the running service doesn't depend on this Blueprint env var being
+      # synced (which requires a paid Blueprint plan on free-tier Web Services).
       # Generate once with `php artisan key:generate --show` and paste here,
       # or leave unset and the entrypoint will generate one on boot.
       - key: APP_KEY
