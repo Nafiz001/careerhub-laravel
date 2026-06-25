@@ -33,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
      * http:// asset URLs because php artisan serve sees the in-container
      * request as plain HTTP. Browsers block those as mixed active content
      * on an https:// page, leaving a blank screen.
+     *
+     * Runs unconditionally — URL::forceScheme('https') is harmless when
+     * the request is already HTTPS, and we never want a blank page because
+     * an env var wasn't set on the deploy.
      */
     private function fixHttpsBehindProxy(): void
     {
@@ -42,22 +46,18 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
-        // Trust Render's edge so X-Forwarded-Proto / X-Forwarded-Host are
-        // honoured by Symfony's request. '*' is fine here because we only
-        // trust the forwarding headers — we still validate the request
-        // body and never act on payload from those headers.
-        if (config('app.env') === 'production') {
-            $request->setTrustedProxies(
-                ['127.0.0.1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '::1'],
-                Request::HEADER_X_FORWARDED_FOR
-                | Request::HEADER_X_FORWARDED_HOST
-                | Request::HEADER_X_FORWARDED_PORT
-                | Request::HEADER_X_FORWARDED_PROTO
-            );
+        // Trust common proxy CIDRs so X-Forwarded-* headers from the
+        // rendering edge are honoured by Symfony's request.
+        $request->setTrustedProxies(
+            ['127.0.0.1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '::1'],
+            Request::HEADER_X_FORWARDED_FOR
+            | Request::HEADER_X_FORWARDED_HOST
+            | Request::HEADER_X_FORWARDED_PORT
+            | Request::HEADER_X_FORWARDED_PROTO
+        );
 
-            if ($request->isSecure() || $request->headers->get('X-Forwarded-Proto') === 'https') {
-                URL::forceScheme('https');
-            }
+        if ($request->isSecure() || $request->headers->get('X-Forwarded-Proto') === 'https') {
+            URL::forceScheme('https');
         }
     }
 }
